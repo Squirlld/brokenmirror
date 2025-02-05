@@ -18,6 +18,9 @@ services:
     restart: always
     image: "redis:alpine"
     hostname: redis
+    sysctls:
+      - net.core.somaxconn=1024
+      - vm.overcommit_memory=1
     networks:
       - rengine_network
 
