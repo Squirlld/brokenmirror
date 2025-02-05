@@ -76,6 +76,7 @@ DATABASES = {
 
 # Application definition
 INSTALLED_APPS = [
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -140,6 +141,17 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 500,
 }
 WSGI_APPLICATION = 'reNgine.wsgi.application'
+
+ASGI_APPLICATION = 'reNgine.asgi.application'
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("redis://localhost:6379")],
+        },
+    },
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators
