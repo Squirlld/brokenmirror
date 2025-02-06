@@ -139,6 +139,7 @@ REST_FRAMEWORK = {
     ),
     'PAGE_SIZE': 500,
 }
+
 WSGI_APPLICATION = 'reNgine.wsgi.application'
 
 # Password validation
@@ -198,8 +199,10 @@ DELETE_DUPLICATES_THRESHOLD = 10
 '''
 CELERY settings
 '''
-CELERY_BROKER_URL = env("CELERY_BROKER", default="redis://redis:6379/0")
-CELERY_RESULT_BACKEND = env("CELERY_BROKER", default="redis://redis:6379/0")
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER", "redis://redis:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_BACKEND", "redis://redis:6379/0")
+CELERY_TASK_ALWAYS_EAGER = False
+CELERY_TASK_TRACK_STARTED = True
 CELERY_ENABLE_UTC = False
 CELERY_TIMEZONE = 'UTC'
 CELERY_IGNORE_RESULTS = False
