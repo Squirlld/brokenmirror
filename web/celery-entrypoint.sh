@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# Wait for PostgreSQL to be ready
+echo "Waiting for PostgreSQL..."
+while ! nc -z db 5432; do
+  sleep 1
+done
+echo "PostgreSQL is up."
+
+# Start Celery worker
+echo "Starting Celery worker..."
+exec celery -A reNgine worker --loglevel=info
+
 # apply existing migrations
 python3 manage.py migrate
 
