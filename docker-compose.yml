@@ -1,7 +1,7 @@
 services:
   db:
     restart: always
-    image: "postgres:12.3-alpine"
+    image: "postgres:16-alpine"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -17,6 +17,9 @@ services:
   redis:
     restart: always
     image: "redis:alpine"
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf
     hostname: redis
     sysctls:
       - net.core.somaxconn=1024
