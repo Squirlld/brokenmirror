@@ -28,7 +28,7 @@ while getopts nh opt; do
 done
 
 if [ $isNonInteractive = false ]; then
-    read -p "Are you sure you made changes to .env file? (y/n) " answer
+    read -p "Are you sure, you made changes to .env file (y/n)? " answer
     case ${answer:0:1} in
         y|Y|yes|YES|Yes )
           echo "Continuing Installation!"
@@ -44,7 +44,7 @@ fi
 echo " "
 tput setaf 3;
 echo "#########################################################################"
-echo "Please note that this installation script is only intended for Linux"
+echo "Please note that, this installation script is only intended for Linux"
 echo "For Mac and Windows, refer to the official guide https://rengine.wiki"
 echo "#########################################################################"
 
@@ -52,7 +52,9 @@ echo " "
 tput setaf 4;
 echo "Installing reNgine and its dependencies"
 
-if [ "$EUID" -ne 0 ]; then
+echo " "
+if [ "$EUID" -ne 0 ]
+  then
   tput setaf 1; echo "Error installing reNgine, Please run this script as root!"
   tput setaf 1; echo "Example: sudo ./install.sh"
   exit
@@ -78,10 +80,51 @@ echo "Redis memory overcommit fix applied successfully!"
 echo " "
 tput setaf 4;
 echo "#########################################################################"
-echo "Installing required packages (curl, docker, docker-compose, make)"
+echo "Installing curl..."
 echo "#########################################################################"
+if [ -x "$(command -v curl)" ]; then
+  tput setaf 2; echo "CURL already installed, skipping."
+else
+  sudo apt update && sudo apt install curl -y
+  tput setaf 2; echo "CURL installed!!!"
+fi
 
-sudo apt update && sudo apt install -y curl docker.io docker-compose make
+echo " "
+tput setaf 4;
+echo "#########################################################################"
+echo "Installing Docker..."
+echo "#########################################################################"
+if [ -x "$(command -v docker)" ]; then
+  tput setaf 2; echo "Docker already installed, skipping."
+else
+  curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
+  tput setaf 2; echo "Docker installed!!!"
+fi
+
+echo " "
+tput setaf 4;
+echo "#########################################################################"
+echo "Installing Docker Compose"
+echo "#########################################################################"
+if [ -x "$(command -v docker compose)" ]; then
+  tput setaf 2; echo "Docker Compose already installed, skipping."
+else
+  curl -L "https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+  chmod +x /usr/local/bin/docker-compose
+  ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
+  tput setaf 2; echo "Docker Compose installed!!!"
+fi
+
+echo " "
+tput setaf 4;
+echo "#########################################################################"
+echo "Installing make"
+echo "#########################################################################"
+if [ -x "$(command -v make)" ]; then
+  tput setaf 2; echo "make already installed, skipping."
+else
+  apt install make
+fi
 
 echo " "
 tput setaf 4;
@@ -97,54 +140,6 @@ else
   echo "You can run docker service using sudo systemctl start docker"
   exit 1
 fi
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Removing orphaned Docker containers..."
-echo "#########################################################################"
-docker-compose down --remove-orphans
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Resetting PostgreSQL database schema if needed..."
-echo "#########################################################################"
-
-docker-compose up -d db  # Ensure the database container is running
-sleep 5  # Wait for DB to be ready
-
-if docker exec rengine-db-1 psql -U rengine -d rengine -c "SELECT 1 FROM django_migrations LIMIT 1;" >/dev/null 2>&1; then
-  echo "Migrations already applied, skipping..."
-else
-  echo "Resetting database schema to prevent migration conflicts..."
-  docker exec rengine-db-1 psql -U rengine -d rengine -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-fi
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Fixing outdated nginx config for HTTP2"
-echo "#########################################################################"
-
-sed -i 's/listen .*http2/listen 443 ssl http2;/' config/nginx/rengine.conf
-echo "Updated nginx config to use the correct HTTP2 directive."
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Fixing Python dependency issues before install..."
-echo "#########################################################################"
-
-# Create a constraints file to pin conflicting dependencies
-cat <<EOT > constraints.txt
-SQLAlchemy==1.4.49
-tenacity==8.0.1
-langchain==0.1.4
-EOT
-
-# Install dependencies with constraints to prevent conflicts
-docker-compose build --no-cache
 
 echo " "
 tput setaf 4;
