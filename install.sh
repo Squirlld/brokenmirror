@@ -159,6 +159,15 @@ fi
 echo " "
 tput setaf 4;
 echo "#########################################################################"
+echo "Fixing outdated nginx config for HTTP2"
+echo "#########################################################################"
+
+sed -i 's/listen .*http2/listen 443 ssl http2;/' config/nginx/rengine.conf
+echo "Updated nginx config to use the correct HTTP2 directive."
+
+echo " "
+tput setaf 4;
+echo "#########################################################################"
 echo "Installing reNgine"
 echo "#########################################################################"
 make certs && make build && make up && tput setaf 2 && echo "reNgine is installed!!!" && failed=0 || failed=1
