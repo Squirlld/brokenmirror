@@ -31,7 +31,7 @@ if [ $isNonInteractive = false ]; then
     read -p "Are you sure, you made changes to .env file (y/n)? " answer
     case ${answer:0:1} in
         y|Y|yes|YES|Yes )
-          echo "Continiuing Installation!"
+          echo "Continuing Installation!"
         ;;
         * )
           nano .env
@@ -63,6 +63,23 @@ fi
 echo " "
 tput setaf 4;
 echo "#########################################################################"
+echo "Applying Redis memory overcommit fix..."
+echo "#########################################################################"
+
+# Ensure the sysctl setting is persistent
+if ! grep -q "vm.overcommit_memory=1" /etc/sysctl.conf; then
+    echo "vm.overcommit_memory=1" | sudo tee -a /etc/sysctl.conf
+fi
+
+# Apply the setting immediately
+sudo sysctl -w vm.overcommit_memory=1
+sudo sysctl -p
+
+echo "Redis memory overcommit fix applied successfully!"
+
+echo " "
+tput setaf 4;
+echo "#########################################################################"
 echo "Installing curl..."
 echo "#########################################################################"
 if [ -x "$(command -v curl)" ]; then
@@ -84,7 +101,6 @@ else
   tput setaf 2; echo "Docker installed!!!"
 fi
 
-
 echo " "
 tput setaf 4;
 echo "#########################################################################"
@@ -98,7 +114,6 @@ else
   ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
   tput setaf 2; echo "Docker Compose installed!!!"
 fi
-
 
 echo " "
 tput setaf 4;
@@ -125,8 +140,6 @@ else
   echo "You can run docker service using sudo systemctl start docker"
   exit 1
 fi
-
-
 
 echo " "
 tput setaf 4;
