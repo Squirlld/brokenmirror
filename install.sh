@@ -52,7 +52,6 @@ echo " "
 tput setaf 4;
 echo "Installing reNgine and its dependencies"
 
-echo " "
 if [ "$EUID" -ne 0 ]
   then
   tput setaf 1; echo "Error installing reNgine, Please run this script as root!"
@@ -139,6 +138,22 @@ else
   echo "Docker is not running. Please run docker and try again."
   echo "You can run docker service using sudo systemctl start docker"
   exit 1
+fi
+
+echo " "
+tput setaf 4;
+echo "#########################################################################"
+echo "Resetting the database to prevent migration conflicts..."
+echo "#########################################################################"
+
+docker-compose up -d db  # Ensure the database container is running
+sleep 5  # Wait for DB to be ready
+
+if docker exec rengine-db-1 psql -U rengine -d rengine -c "SELECT 1 FROM django_migrations LIMIT 1;" >/dev/null 2>&1; then
+  echo "Migrations already applied, skipping..."
+else
+  echo "Applying database migrations..."
+  docker exec rengine-db-1 psql -U rengine -d rengine -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 fi
 
 echo " "
