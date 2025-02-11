@@ -1,16 +1,18 @@
+version: '3.8'  # Ensure this matches your Docker Compose version
+
 services:
   db:
     restart: always
     image: "postgres:12.3-alpine"
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: ${POSTGRES_PORT}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data/
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - rengine_network
 
@@ -19,6 +21,9 @@ services:
     image: "redis:alpine"
     hostname: redis
     command: redis-server /usr/local/etc/redis/redis.conf
+    sysctls:
+      - net.core.somaxconn=511
+      - vm.overcommit_memory=1
     volumes:
       - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
@@ -29,7 +34,6 @@ services:
       context: ./web
     restart: always
     entrypoint: /usr/src/app/celery-entrypoint.sh
-    # command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l INFO
     volumes:
       - ./web:/usr/src/app
       - github_repos:/usr/src/github
@@ -38,19 +42,19 @@ services:
       - gf_patterns:/root/.gf
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
-      - static_volume:/usr/src/app/staticfiles/
+      - static_volume:/usr/src/app/staticfiles
     environment:
-      - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - DOMAIN_NAME=${DOMAIN_NAME}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - MAX_CONCURRENCY=${MAX_CONCURRENCY}
-      - MIN_CONCURRENCY=${MIN_CONCURRENCY}
+      DEBUG: "0"
+      CELERY_BROKER: redis://redis:6379/0
+      CELERY_BACKEND: redis://redis:6379/0
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      MAX_CONCURRENCY: ${MAX_CONCURRENCY}
+      MIN_CONCURRENCY: ${MIN_CONCURRENCY}
     depends_on:
       - db
       - redis
@@ -58,17 +62,19 @@ services:
       - rengine_network
 
   celery-beat:
-    build: ./web
+    build:
+      context: ./web
+    restart: always
     entrypoint: /usr/src/app/beat-entrypoint.sh
     command: celery -A reNgine beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
+      CELERY_BROKER: redis://redis:6379/0
+      CELERY_BACKEND: redis://redis:6379/0
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
     depends_on:
       - celery
       - db
@@ -90,16 +96,16 @@ services:
     restart: always
     image: docker.pkg.github.com/yogeshojha/rengine/rengine:latest
     environment:
-      - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - DOMAIN_NAME=${DOMAIN_NAME}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+      DEBUG: "0"
+      CELERY_BROKER: redis://redis:6379/0
+      CELERY_BACKEND: redis://redis:6379/0
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD}
     volumes:
       - ./web:/usr/src/app
       - github_repos:/usr/src/github
@@ -108,7 +114,7 @@ services:
       - gf_patterns:/root/.gf
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
-      - static_volume:/usr/src/app/staticfiles/
+      - static_volume:/usr/src/app/staticfiles
     ports:
       - "127.0.0.1:8000:8000"
     depends_on:
@@ -116,33 +122,25 @@ services:
       - celery
       - celery-beat
     networks:
-      rengine_network:
-        aliases:
-          - rengine
+      - rengine_network
 
   proxy:
     restart: always
     image: nginx:alpine
     ports:
-      - 8082:8082/tcp
-      - 443:443/tcp
+      - "8082:8082"
+      - "443:443"
     depends_on:
       - web
       - db
       - redis
-    secrets:
-      - source: proxy.ca
-        target: /etc/nginx/certs/rengine_chain.pem
-      - source: proxy.cert
-        target: /etc/nginx/certs/rengine.pem
-      - source: proxy.key
-        target: /etc/nginx/certs/rengine_rsa.key
     volumes:
       - ./config/nginx/rengine.conf:/etc/nginx/conf.d/rengine.conf:ro
-      - static_volume:/usr/src/app/staticfiles/
+      - static_volume:/usr/src/app/staticfiles
       - scan_results:/usr/src/scan_results
     networks:
       - rengine_network
+
   ollama:
     image: ollama/ollama
     container_name: ollama
@@ -155,6 +153,7 @@ services:
 
 networks:
   rengine_network:
+    driver: bridge
 
 volumes:
   tool_config:
@@ -166,11 +165,3 @@ volumes:
   scan_results:
   static_volume:
   ollama_data:
-
-secrets:
-  proxy.ca:
-    file: ./secrets/certs/rengine_chain.pem
-  proxy.key:
-    file: ./secrets/certs/rengine_rsa.key
-  proxy.cert:
-    file: ./secrets/certs/rengine.pem
