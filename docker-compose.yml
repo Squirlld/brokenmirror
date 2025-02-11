@@ -18,6 +18,9 @@ services:
     restart: always
     image: "redis:alpine"
     hostname: redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     networks:
       - rengine_network
 
