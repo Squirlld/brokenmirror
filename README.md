@@ -173,7 +173,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 1. Clone the repository
 
     ```bash
-    git clone https://github.com/squirrld/brokenmirror && cd brokenmirror
+    git clone https://github.com/squirlld/brokenmirror && cd brokenmirror
     ```
 
 1. Configure the environment
