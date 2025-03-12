@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Exit immediately if a command exits with a non-zero status
+# Exit immediately if a command fails
 set -e
 
-# Define colors
+# Define colors for readability
 if command -v tput >/dev/null 2>&1; then
     GREEN=$(tput setaf 2)
     RED=$(tput setaf 1)
@@ -31,24 +31,12 @@ echo -e "${GREEN}"
 cat web/art/reNgine.txt
 echo -e "${RESET}"
 
-echo -e "${RED}Before running this script, ensure Docker is running and update the .env file.${RESET}"
+echo -e "${RED}Before running this script, ensure you have updated the .env file.${RESET}"
 echo -e "${YELLOW}Changing the Postgres username & password in .env is highly recommended.${RESET}"
 
-# Check for required tools
-if ! command -v docker >/dev/null 2>&1; then
-    echo -e "${RED}Error: Docker is not installed. Please install Docker first.${RESET}"
-    exit 1
-fi
-
-if ! command -v docker-compose >/dev/null 2>&1; then
-    echo -e "${RED}Error: Docker Compose is not installed. Please install it first.${RESET}"
-    exit 1
-fi
-
-# Environment file check
-ENV_FILE=".env"
-if [[ ! -f "$ENV_FILE" ]]; then
-    echo -e "${RED}Error: .env file not found! Please create and configure it before proceeding.${RESET}"
+# Check if running as root (for package installation)
+if [[ $EUID -ne 0 ]]; then
+    echo -e "${RED}This script must be run as root (use sudo).${RESET}"
     exit 1
 fi
 
@@ -61,6 +49,43 @@ while getopts "nh" opt; do
         ?) usageFunction ;;
     esac
 done
+
+# Ensure required packages are installed
+echo -e "${GREEN}Updating package list and installing dependencies...${RESET}"
+apt-get update -y && apt-get install -y \
+    curl \
+    git \
+    unzip \
+    nano \
+    python3 \
+    python3-pip
+
+# Install Docker if not installed
+if ! command -v docker >/dev/null 2>&1; then
+    echo -e "${YELLOW}Docker is not installed. Installing now...${RESET}"
+    apt-get install -y docker.io
+    systemctl enable --now docker
+fi
+
+# Install Docker Compose if not installed
+if ! command -v docker-compose >/dev/null 2>&1; then
+    echo -e "${YELLOW}Docker Compose is not installed. Installing now...${RESET}"
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+fi
+
+# Ensure Docker is running
+if ! systemctl is-active --quiet docker; then
+    echo -e "${RED}Docker is installed but not running. Starting Docker...${RESET}"
+    systemctl start docker
+fi
+
+# Environment file check
+ENV_FILE=".env"
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo -e "${RED}Error: .env file not found! Please create and configure it before proceeding.${RESET}"
+    exit 1
+fi
 
 # Prompt user to confirm .env modifications (if interactive)
 if [[ "$isNonInteractive" == "false" ]]; then
@@ -80,18 +105,6 @@ echo -e "\n${BLUE}##############################################################
 echo -e "${YELLOW}This installation script is intended for Linux.${RESET}"
 echo -e "${YELLOW}For Mac and Windows, refer to the official guide: https://rengine.wiki${RESET}"
 echo -e "${BLUE}#########################################################################${RESET}\n"
-
-# Ensure required packages are installed
-echo -e "${GREEN}Updating package list and installing dependencies...${RESET}"
-sudo apt-get update -y && sudo apt-get install -y \
-    curl \
-    git \
-    unzip \
-    nano \
-    python3 \
-    python3-pip \
-    docker.io \
-    docker-compose
 
 echo -e "${GREEN}Installing project dependencies...${RESET}"
 pip3 install -r requirements.txt
