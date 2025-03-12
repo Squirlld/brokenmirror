@@ -1,153 +1,107 @@
 #!/bin/bash
 
-usageFunction()
-{
-  echo " "
-  tput setaf 2;
-  echo "Usage: $0 (-n) (-h)"
-  echo -e "\t-n Non-interactive installation (Optional)"
-  echo -e "\t-h Show usage"
-  exit 1
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# Define colors
+if command -v tput >/dev/null 2>&1; then
+    GREEN=$(tput setaf 2)
+    RED=$(tput setaf 1)
+    YELLOW=$(tput setaf 3)
+    BLUE=$(tput setaf 4)
+    RESET=$(tput sgr0)
+else
+    GREEN=""; RED=""; YELLOW=""; BLUE=""; RESET=""
+fi
+
+# Log setup
+LOGFILE="install.log"
+exec > >(tee -a "$LOGFILE") 2>&1
+
+# Usage function
+usageFunction() {
+    echo -e "${GREEN}Usage: $0 (-n) (-h)${RESET}"
+    echo -e "\t-n Non-interactive installation (Optional)"
+    echo -e "\t-h Show usage"
+    exit 1
 }
 
-tput setaf 2;
+# Banner
+echo -e "${GREEN}"
 cat web/art/reNgine.txt
+echo -e "${RESET}"
 
-tput setaf 1; echo "Before running this script, please make sure Docker is running and you have made changes to .env file."
-tput setaf 2; echo "Changing the postgres username & password from .env is highly recommended."
+echo -e "${RED}Before running this script, ensure Docker is running and update the .env file.${RESET}"
+echo -e "${YELLOW}Changing the Postgres username & password in .env is highly recommended.${RESET}"
 
-tput setaf 4;
+# Check for required tools
+if ! command -v docker >/dev/null 2>&1; then
+    echo -e "${RED}Error: Docker is not installed. Please install Docker first.${RESET}"
+    exit 1
+fi
 
+if ! command -v docker-compose >/dev/null 2>&1; then
+    echo -e "${RED}Error: Docker Compose is not installed. Please install it first.${RESET}"
+    exit 1
+fi
+
+# Environment file check
+ENV_FILE=".env"
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo -e "${RED}Error: .env file not found! Please create and configure it before proceeding.${RESET}"
+    exit 1
+fi
+
+# Parse command-line arguments
 isNonInteractive=false
-while getopts nh opt; do
-   case $opt in
-      n) isNonInteractive=true ;;
-      h) usageFunction ;;
-      ?) usageFunction ;;
-   esac
+while getopts "nh" opt; do
+    case "$opt" in
+        n) isNonInteractive=true ;;
+        h) usageFunction ;;
+        ?) usageFunction ;;
+    esac
 done
 
-if [ $isNonInteractive = false ]; then
-    read -p "Are you sure, you made changes to .env file (y/n)? " answer
-    case ${answer:0:1} in
-        y|Y|yes|YES|Yes )
-          echo "Continiuing Installation!"
-        ;;
-        * )
-          nano .env
-        ;;
-    esac
+# Prompt user to confirm .env modifications (if interactive)
+if [[ "$isNonInteractive" == "false" ]]; then
+    while true; do
+        read -p "Have you updated the .env file? (y/n) " answer
+        case "$answer" in
+            [Yy]*) break ;;  # Proceed with installation
+            [Nn]*) echo -e "${RED}Please update .env before proceeding.${RESET}"; exit 1 ;;
+            *) echo -e "${YELLOW}Invalid input. Please enter 'y' or 'n'.${RESET}" ;;
+        esac
+    done
 else
-  echo "Non-interactive installation parameter set. Installation begins."
+    echo -e "${YELLOW}Non-interactive installation mode enabled. Proceeding with installation.${RESET}"
 fi
 
-echo " "
-tput setaf 3;
-echo "#########################################################################"
-echo "Please note that, this installation script is only intended for Linux"
-echo "For Mac and Windows, refer to the official guide https://rengine.wiki"
-echo "#########################################################################"
+echo -e "\n${BLUE}#########################################################################${RESET}"
+echo -e "${YELLOW}This installation script is intended for Linux.${RESET}"
+echo -e "${YELLOW}For Mac and Windows, refer to the official guide: https://rengine.wiki${RESET}"
+echo -e "${BLUE}#########################################################################${RESET}\n"
 
-echo " "
-tput setaf 4;
-echo "Installing reNgine and its dependencies"
+# Ensure required packages are installed
+echo -e "${GREEN}Updating package list and installing dependencies...${RESET}"
+sudo apt-get update -y && sudo apt-get install -y \
+    curl \
+    git \
+    unzip \
+    nano \
+    python3 \
+    python3-pip \
+    docker.io \
+    docker-compose
 
-echo " "
-if [ "$EUID" -ne 0 ]
-  then
-  tput setaf 1; echo "Error installing reNgine, Please run this script as root!"
-  tput setaf 1; echo "Example: sudo ./install.sh"
-  exit
-fi
+echo -e "${GREEN}Installing project dependencies...${RESET}"
+pip3 install -r requirements.txt
 
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Installing curl..."
-echo "#########################################################################"
-if [ -x "$(command -v curl)" ]; then
-  tput setaf 2; echo "CURL already installed, skipping."
-else
-  sudo apt update && sudo apt install curl -y
-  tput setaf 2; echo "CURL installed!!!"
-fi
+# Ensure correct file permissions
+echo -e "${GREEN}Setting up file permissions...${RESET}"
+chmod +x start.sh stop.sh
 
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Installing Docker..."
-echo "#########################################################################"
-if [ -x "$(command -v docker)" ]; then
-  tput setaf 2; echo "Docker already installed, skipping."
-else
-  curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh
-  tput setaf 2; echo "Docker installed!!!"
-fi
+# Start services
+echo -e "${GREEN}Starting Docker services...${RESET}"
+docker-compose up -d
 
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Installing Docker Compose"
-echo "#########################################################################"
-if [ -x "$(command -v docker compose)" ]; then
-  tput setaf 2; echo "Docker Compose already installed, skipping."
-else
-  curl -L "https://github.com/docker/compose/releases/download/v2.5.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-  chmod +x /usr/local/bin/docker-compose
-  ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-  tput setaf 2; echo "Docker Compose installed!!!"
-fi
-
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Installing make"
-echo "#########################################################################"
-if [ -x "$(command -v make)" ]; then
-  tput setaf 2; echo "make already installed, skipping."
-else
-  apt install make
-fi
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Checking Docker status"
-echo "#########################################################################"
-if docker info >/dev/null 2>&1; then
-  tput setaf 4;
-  echo "Docker is running."
-else
-  tput setaf 1;
-  echo "Docker is not running. Please run docker and try again."
-  echo "You can run docker service using sudo systemctl start docker"
-  exit 1
-fi
-
-
-
-echo " "
-tput setaf 4;
-echo "#########################################################################"
-echo "Installing reNgine"
-echo "#########################################################################"
-make certs && make build && make up && tput setaf 2 && echo "reNgine is installed!!!" && failed=0 || failed=1
-
-if [ "${failed}" -eq 0 ]; then
-  sleep 3
-
-  echo " "
-  tput setaf 4;
-  echo "#########################################################################"
-  echo "Creating an account"
-  echo "#########################################################################"
-  make username isNonInteractive=$isNonInteractive
-  make migrate
-
-  tput setaf 2 && printf "\n%s\n" "Thank you for installing reNgine, happy recon!!"
-  echo "In case you have unapplied migrations (see above in red), run 'make migrate'"
-else
-  tput setaf 1 && printf "\n%s\n" "reNgine installation failed!!"
-fi
+echo -e "${GREEN}Installation complete! You can now access the application.${RESET}"
